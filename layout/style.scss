@@ -1,0 +1,260 @@
+$headerColor: #ffa266;
+$backgroundColor: #fff1d9;
+$foregroundColor: #ae6b40;
+$highlightColor: #F80;
+
+html {
+	margin: 0;
+	background-color: $headerColor;
+	font-family: "Helvetica Neue", "sans-serif";
+	width: 100%;
+}
+
+body {
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	margin: 0;
+	width: 100%;
+	overflow-x: hidden;
+}
+
+#header {
+	margin: 0;
+	padding: 8px;
+	background-color: #ffa266;
+	overflow: hidden;
+	position: relative;
+
+	h1 {
+		color: white;
+		text-shadow: 0 1px #945c52;;
+		text-align: center;
+		margin-bottom: 2px;
+	}
+	h4 {
+		color: #945c52;;
+		//text-shadow: 0 1px rgba(lighten(#AB9978, 10%), 0.5);
+		text-align: center;
+		margin-top: 2px;
+	}
+
+	nav {
+		position: absolute;
+		height: 60px;
+
+		button,
+		label.filebutton {
+			-webkit-filter: invert(100%) sepia(100%);
+
+			&:hover {
+				-webkit-filter: invert(80%) sepia(100%);		
+			}
+		}
+	}
+}
+
+#content {
+	background-color: $backgroundColor;
+	padding-top: 30px;
+}
+
+#editor {
+	outline: 0;
+	color: $foregroundColor;
+}
+
+#editor * {
+	transition-duration: 0.5s;
+}
+
+.hidden {
+	opacity: 0;
+	font-size: 0;
+	transition-duration: 0.5s;
+}
+
+.active .hidden,
+.active.hidden {
+	opacity: 1;
+	transition-duration: 0.5s;
+	font-size:inherit;
+}
+
+.active {
+	color: $highlightColor;
+}
+
+.animated {
+	transition-duration: 0.5s;
+}
+
+.align-right {
+	text-align: right;
+}
+
+.align-center {
+	text-align: center;
+}
+
+.align-justify {
+	text-align: justify;
+}
+
+nav {
+	position: fixed;
+	height: 100%;
+	padding: 10px;
+	top: 0px;
+	right: 0px;
+	//background-color: $backgroundColor;
+}
+nav button {
+	background: none;
+	border: none;
+	display: block;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	top: 0px;
+	position: relative;
+	transition-duration: 0.3s;
+	-webkit-filter: invert(50%) sepia(100%);
+
+	&:hover {
+		-webkit-filter: invert(60%) sepia(100%);		
+	}
+
+	img {
+		margin: auto;
+		left: 0;
+	}
+}
+
+/****************************************************************
+* SETTINGS MENU
+****************************************************************/
+
+#settingsMenu {
+	position: fixed;
+	height: 60px;
+	width: 100%;
+	top:-110px;
+	left: 0;
+	padding: 20px;
+	transition-duration: 0.4s;
+	border-botom: 1px solid lighten(#AB9978, 10%);
+	background-color: $backgroundColor;
+	box-shadow: 0 0 1px 1px rgba(lighten(#AB9978, 10%), 0.5);
+
+	&.open {
+		top: 0px;
+	}
+
+	input {
+		display: inline;
+	}
+}
+
+#file {
+	display: block;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	top: 0px;
+	position: relative;
+	transition-duration: 0.3s;
+	//-webkit-filter: invert(50%) sepia(100%);
+
+	background: url("../images/JustType-assets/download.png") no-repeat;
+	border: none;
+	cursor:pointer;
+
+	&:hover {
+		-webkit-filter: invert(60%) sepia(100%);		
+	}
+
+	img {
+		margin: auto;
+		left: 0;
+	}
+}
+
+
+label.filebutton {
+	display: block;
+	width: 12px;
+	height: 12px;
+	padding: 6px;
+	top: 0px;
+    overflow:hidden;
+    position:relative;
+    -webkit-filter: invert(50%) sepia(100%);
+
+   	&:hover {
+		-webkit-filter: invert(60%) sepia(100%);		
+	}
+
+	img {
+		margin: auto;
+		left: 0;
+	}
+}
+
+label span input {
+    z-index: 999;
+    line-height: 0;
+    font-size: 50px;
+    position: absolute;
+    top: -2px;
+    left: -700px;
+    opacity: 0;
+    filter: alpha(opacity = 0);
+    -ms-filter: "alpha(opacity=0)";
+    cursor: pointer;
+    _cursor: hand;
+    margin: 0;
+    padding:0;
+}
+
+/****************************************************************
+* PAPER LAYOUT
+****************************************************************/
+
+#paper {
+	width: 21cm;
+	height: 29.7cm;
+	margin: auto;
+	background-color: white;
+	position: relative;
+}
+
+#editor {
+	position: relative;
+    padding-top: 0.6cm;
+    padding-bottom: 2cm;
+    padding-left: 2.4cm !important;
+    padding-right: 2.5cm
+}
+
+body {
+	font-size: 10pt
+}
+
+/****************************************************************
+* PRINT LAYOUT
+****************************************************************/
+
+@media print
+{
+	body, * {
+		background-color: white;
+	}
+
+	#editor * {
+		color: black;
+	}
+
+	.hidden {
+		display: none;
+	}
+}

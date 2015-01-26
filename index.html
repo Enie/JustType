@@ -1,0 +1,660 @@
+<!DOCTYPE html lang="de">
+<head>
+	<title>Just Type</title>
+
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta name="viewport" content="width=device-width, height=device-height">
+
+	<link rel="stylesheet" type="text/css" href="layout/style.css">
+
+	<!--link href="http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,700,400italic,700italic%7cCarrois+Gothic%7cUbuntu+Condensed" rel="stylesheet" type="text/css"-->
+
+	<script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
+    <!--script src="bower_components/jquery/dist/jquery.min.js" type="text/javascript"></script-->
+	<!--script src="scripts/script.js"></script-->
+	<script>
+
+/****************************************************************
+* FULLSCREEN
+****************************************************************/
+
+		var inFullscreen = false;
+		var debug = false;
+
+		function launchIntoFullscreen(element) {
+			if(element.requestFullscreen) {
+				element.requestFullscreen();
+			} else if(element.mozRequestFullScreen) {
+				element.mozRequestFullScreen();
+			} else if(element.webkitRequestFullscreen) {
+				element.webkitRequestFullscreen();
+			} else if(element.msRequestFullscreen) {
+				element.msRequestFullscreen();
+			}
+		}
+
+		// Whack fullscreen
+		function exitFullscreen() {
+			if(document.exitFullscreen) {
+				document.exitFullscreen();
+			} else if(document.mozCancelFullScreen) {
+				document.mozCancelFullScreen();
+			} else if(document.webkitExitFullscreen) {
+				document.webkitExitFullscreen();
+			}
+		}
+
+		$(document).on('click', '#fullscreenButton', function()
+		{
+			if(inFullscreen) // document.fullscreenEnabled || document.mozFullScreenEnabled || document.webkitFullscreenEnabled;
+			{
+				exitFullscreen();
+				inFullscreen=false;
+			}
+			else
+			{
+				launchIntoFullscreen(document.documentElement); // the whole page
+				inFullscreen=true;
+			}
+		});
+
+
+/****************************************************************
+* SETTINGS
+****************************************************************/
+
+		$(document).on('click', '#settingsButton', function()
+		{
+			if( $('#settingsMenu').hasClass('open') )
+			{
+				$('#settingsMenu').removeClass('open');	
+			}
+			else
+			{
+				$('#settingsMenu').addClass('open');
+			}
+		});
+
+		$(document).on('click', '#showPaperCheckbox', function()
+		{
+			//alert("changed");
+			if(this.checked)
+			{
+				$('#paper').css('background-color', 'white');
+			}
+			else
+			{
+				$('#paper').css('background-color', 'transparent');
+			}
+		});
+
+		$(document).on('click', '#serifFontCheckbox', function()
+		{
+			//alert("changed");
+			if(this.checked)
+			{
+				$('editor').css('font-family', 'serif');
+			}
+			else
+			{
+				$('editor').css('font-family', '"Helvetica Neue", "sans-serif"');
+			}
+		});
+
+/****************************************************************
+* READING LOCAL FILES
+****************************************************************/
+
+		function startRead(element)
+		{
+		  // obtain input element through DOM 
+		  
+		  var file = element.files[0];
+			if(file)
+			{
+				getAsText(file);
+			}
+		}
+
+		function getAsText(readFile)
+		{
+			var reader;
+			try
+			{
+				reader = new FileReader();
+			}catch(e)
+			{
+				document.getElementById('editor').innerHTML = 
+					"Error: seems File API is not supported on your browser";
+				return;
+			}
+
+			// Read file into memory as UTF-8      
+			reader.readAsText(readFile, "UTF-8");
+
+			// Handle progress, success, and errors
+			reader.onprogress = updateProgress;
+			reader.onload = loaded;
+			reader.onerror = errorHandler;
+		}
+
+		function updateProgress(evt)
+		{
+			if (evt.lengthComputable)
+			{
+				// evt.loaded and evt.total are ProgressEvent properties
+				var loaded = (evt.loaded / evt.total);
+				if (loaded < 1)
+					{
+					// Increase the prog bar length
+					// style.width = (loaded * 200) + "px";
+					//document.getElementById("bar").style.width = (loaded*100) + "%";
+				}
+			}
+		}
+
+		function loaded(evt)
+		{
+			// Obtain the read file data    
+			var fileString = evt.target.result;
+			document.getElementById('editor').innerHTML = fileString;
+			//document.getElementById("bar").style.width = 100 + "%";
+		}
+
+		function errorHandler(evt)
+		{
+			if(evt.target.error.code == evt.target.error.NOT_READABLE_ERR)
+			{
+			// The file could not be read
+				document.getElementById('editor').innerHTML = "Error reading file..."
+			}
+		}
+
+		String.prototype.insert = function (string, index) {
+			return [this.slice(0, index), string, this.slice(index)].join('');
+			/*if (index > 0)
+				return this.substring(0, index) + string + this.substring(index, this.length);
+			else
+				return string + this;*/
+		};
+
+/****************************************************************
+* EDITOR - CARET POSITIONING
+****************************************************************/
+
+		function getSelectionStart() {
+			if (document.selection) {
+				return(document.selection.createRange().parentElement());	// IE
+			} else {
+				return(window.getSelection().anchorNode.parentNode); 		// everyone else
+			}
+		}
+
+		var saveSelection, restoreSelection;
+
+			if (window.getSelection && document.createRange) {
+			    saveSelection = function(containerEl) {
+			        var range = window.getSelection().getRangeAt(0);
+			        var preSelectionRange = range.cloneRange();
+			        preSelectionRange.selectNodeContents(containerEl);
+			        preSelectionRange.setEnd(range.startContainer, range.startOffset);
+			        var start = preSelectionRange.toString().length;
+
+			        return {
+			            start: start,
+			            end: start + range.toString().length
+			        };
+			    };
+
+			    restoreSelection = function(containerEl, savedSel) {
+			        var charIndex = 0, range = document.createRange();
+			        range.setStart(containerEl, 0);
+			        range.collapse(true);
+			        var nodeStack = [containerEl], node, foundStart = false, stop = false;
+
+			        while (!stop && (node = nodeStack.pop())) {
+			            if (node.nodeType == 3) {
+			                var nextCharIndex = charIndex + node.length;
+			                if (!foundStart && savedSel.start >= charIndex && savedSel.start <= nextCharIndex) {
+			                    range.setStart(node, savedSel.start - charIndex);
+			                    foundStart = true;
+			                }
+			                if (foundStart && savedSel.end >= charIndex && savedSel.end <= nextCharIndex) {
+			                    range.setEnd(node, savedSel.end - charIndex);
+			                    stop = true;
+			                }
+			                charIndex = nextCharIndex;
+			            } else {
+			                var i = node.childNodes.length;
+			                while (i--) {
+			                    nodeStack.push(node.childNodes[i]);
+			                }
+			            }
+			        }
+
+			        var sel = window.getSelection();
+			        sel.removeAllRanges();
+			        sel.addRange(range);
+			    }
+			} else if (document.selection) {
+			    saveSelection = function(containerEl) {
+			        var selectedTextRange = document.selection.createRange();
+			        var preSelectionTextRange = document.body.createTextRange();
+			        preSelectionTextRange.moveToElementText(containerEl);
+			        preSelectionTextRange.setEndPoint("EndToStart", selectedTextRange);
+			        var start = preSelectionTextRange.text.length;
+
+			        return {
+			            start: start,
+			            end: start + selectedTextRange.text.length
+			        }
+			    };
+
+			    restoreSelection = function(containerEl, savedSel) {
+			        var textRange = document.body.createTextRange();
+			        textRange.moveToElementText(containerEl);
+			        textRange.collapse(true);
+			        textRange.moveEnd("character", savedSel.end);
+			        textRange.moveStart("character", savedSel.start);
+			        textRange.select();
+			    };
+			}
+
+/****************************************************************
+* EDITOR - 
+****************************************************************/
+
+		var textAlignment = {
+			LEFT:0,
+			RIGHT:1,
+			CENTER:2,
+			JUSTIFY:3
+		}
+		var code
+
+		$(document).keypress(function(e)
+		{
+			code = e.keyCode || e.which;
+			/*if(code == 13) { //Enter keycode
+				
+			}*/
+
+		});
+
+		$(document).keyup(function(e)
+		{
+			var editor = document.getElementById("editor");
+			var caretPosition = saveSelection(editor);
+
+			if (debug)
+			{
+				$('div.info').text('caret pos: '+caretPosition.start);
+			}
+		});
+
+		window.onload = function()
+		{
+			var activeElement;
+			var contentChanged = false; //this will tell onselection changed if it was changed due to typing or moving the cursor.
+			var editor = document.getElementById("editor");
+			editor.innerHTML = "";
+			editor.focus();
+			currentTextAlignment = textAlignment.LEFT;
+
+			function alignmentClass()
+			{
+				switch (currentTextAlignment) {
+					case textAlignment.LEFT:
+						return "";
+					case textAlignment.RIGHT:
+						return "class='align-right'";
+					case textAlignment.CENTER:
+						return "class='align-center'";
+					case textAlignment.JUSTIFY:
+						return "class='align-justify'";
+					default:
+						return "";
+				}
+			}
+			
+			/******************************************************
+			* SELECTION CHANGE EVENT LISTENER
+			*******************************************************/
+			document.onselectionchange = function() {
+
+				/******************************************************
+				* HIGHLIGHT CURRENT BLOCK
+				*******************************************************/
+				var index = 0;
+
+				if( $(getSelectionStart()).parentsUntil($("#editor")).length )
+				{
+					index = $(getSelectionStart()).parentsUntil($("#editor")).index();
+					var parents = $(getSelectionStart()).parentsUntil($("#editor"));
+					/*console.log("parent's: ");
+					for (var parentIndex=0; parentIndex < parents.length; parentIndex++)
+					{
+						console.log("\t" + parents[parentIndex].innerText);
+					}
+					console.log(" index: " + index);*/
+				}
+				else
+				{
+					index = $(getSelectionStart()).index();
+					//console.log("selection's index: "+ index);
+				}
+				if($($(editor).children()[index]).html() != undefined)
+				{
+
+					$('.active').removeClass('active');
+					$($(editor).children()[index]).addClass('active');
+				}
+
+				var caretPosition = saveSelection(editor);
+				//console.log("start: " + caretPosition.start + ", end: " + caretPosition.end);
+			};
+			var editorContent = editor.innerText;
+
+			/******************************************************
+			* INPUT EVENT LISTENER
+			*******************************************************/
+			editor.addEventListener("input", function() {
+				contentChanged=true;
+
+				var rawElements = editor.innerText.split("\n\n");
+				var formattedElements = [];
+
+				var htmlLines = editor.childNodes;
+				var numLines = htmlLines.length;
+
+				var caretPosition = saveSelection(editor);
+				currentTextAlignment = textAlignment.LEFT;
+
+				/******************************************************
+				* remove empty lines
+				*******************************************************/
+
+				for (i = 0; i < rawElements.length; i++) {
+					var line = rawElements[i];
+					if (line=="")
+					{
+						if(i!=rawElements.length-1)
+						{
+							rawElements.splice(i, 1);
+							i--;
+						}
+					}
+					else if (line.indexOf(' ') == 0) {
+						rawElements[i] = line.slice(1);
+						//caretPosition.start-=1;
+						//caretPosition.end-=1;
+					}
+				}
+
+				/****************************************************************
+				* parse lines
+				****************************************************************/
+
+				for (i = 0; i < rawElements.length; i++) {
+					var line = rawElements[i].replace(/\x20\xa0/g, "\x20\xa0");
+					var htmlLine = htmlLines[i];
+
+					/****************************************************************
+					* FIND INLINE MARKS
+					****************************************************************/
+					var offset = 0;
+					var inlineContent = "<span class='hidden'></span><b></b><span class='hidden'></span>";
+					var inlineContentLength = inlineContent.length;
+
+					/****************************************************************
+					* - BOLD
+					****************************************************************/
+					while ((match = /\*\*\S+[^*\s\S]*\*\*/.exec(line.slice(offset))) != null) {
+						var tmpLine = line.slice(0, (match.index + match[0].length - 2));
+						line = tmpLine+line.slice(match.index + match[0].length);
+						
+						line = line.insert("</b><span class='hidden'>**</span>", match.index -2 + match[0].length + offset);
+
+						tmpLine = line.slice(0, (match.index));
+						line = tmpLine+line.slice(match.index+2);
+						
+						line = line.insert("<span class='hidden'>**</span><b>", match.index + offset);
+						offset+=match.index + match[0].length + inlineContentLength;
+					}
+
+					offset = 0;
+					inlineContent = "<span class='hidden'></span><i></i><span class='hidden'></span>";
+					inlineContentLength = inlineContent.length;
+
+					/****************************************************************
+					* - ITALIC
+					****************************************************************/
+
+					while ((match = /\*\S+[^*\s\S]*\*/.exec(line.slice(offset))) != null) {
+						var tmpLine = line.slice(0, (match.index + match[0].length - 1));
+						line = tmpLine+line.slice(match.index + match[0].length);
+						
+						line = line.insert("</i><span class='hidden'>*</span>", match.index -1 + match[0].length + offset);
+
+						tmpLine = line.slice(0, (match.index));
+						line = tmpLine+line.slice(match.index+1);
+						
+						line = line.insert("<span class='hidden'>*</span><i>", match.index + offset);
+						offset+=match.index + match[0].length + inlineContentLength;
+					}
+
+					offset = 0;
+					inlineContent = "<span class='hidden'></span><strike></strike><span class='hidden'></span>";
+					inlineContentLength = inlineContent.length;
+
+					/****************************************************************
+					* - STRIKE
+					****************************************************************/
+
+					while ((match = /\~\~\S+[\s\S]*\~\~/.exec(line.slice(offset))) != null) {
+						var tmpLine = line.slice(0, (match.index + match[0].length - 2));
+						line = tmpLine+line.slice(match.index + match[0].length);
+						
+						line = line.insert("</strike><span class='hidden'>~~</span>", match.index -2 + match[0].length + offset);
+
+						tmpLine = line.slice(0, (match.index));
+						line = tmpLine+line.slice(match.index+2);
+						
+						line = line.insert("<span class='hidden'>~~</span><strike>", match.index + offset);
+						offset+=match.index + match[0].length + inlineContentLength;
+					}
+
+					offset = 0;
+					inlineContent = "<a href=''><span class='hidden'></span><span class='hidden'></span></a>";
+					inlineContentLength = inlineContent.length;
+
+					/****************************************************************
+					* - LINK
+					****************************************************************/
+					while ((match = /\[[\w\d\s]*\]\s*\(\S+\)/.exec(line.slice(offset))) != null) {
+						var parts = line.slice(0, (match.index + match[0].length - 1)).slice(match.index+1).split('](');
+						var tmpLine = line.slice(0, match.index)+line.slice(match[0].length);
+						line = tmpLine.insert("<a href=\""+parts[1]+"\"><span class='hidden'>[</span>"+parts[0]+"<span class='hidden'>]("+parts[1]+")</span></a>", match.index + offset);
+
+						offset+=match.index + match[0].length + parts[1].length + inlineContentLength;
+					}
+
+
+					/*var result = "";
+					for (i=0; i<line.length; i++) {
+						hex = line.charCodeAt(i).toString(16);
+						result += (" \000"+hex).slice(-4);
+					}
+					console.log(result);*/
+
+					/****************************************************************
+					* NEW LINE - EMPTY LINE
+					****************************************************************/
+					if (line == "")
+					{
+						if (i-1>=0 && rawElements[i-1].indexOf('+ ') == 0 && htmlLines[i].tagName=="LI")
+						{
+							formattedElements = $("<li><span class='hidden'>+ </span></li>");
+						}
+						else
+						{
+							formattedElements[i] = "<p><br></p>";
+							//caretPosition.start+=1;
+							//caretPosition.end+=1;
+						}
+					}
+					/****************************************************************
+					* NEW LINE - WITH BREAK
+					****************************************************************/
+					else if ( ($(htmlLines[i])[0].tagName=="P" && $(htmlLines[i]).children()[0] ||
+						($(htmlLines[i])[0].tagName=="DIV" && $(htmlLines[i]).children()[0]) ) &&
+						$(htmlLines[i]).children()[0].tagName=="BR" &&
+						line.length == 1
+						)
+					{
+						formattedElements[i] = "<p><br></p>";
+						//caretPosition.start+=1;
+						//caretPosition.end+=1;
+					}
+					/****************************************************************
+					* CONTINUE UNORDERED LIST
+					****************************************************************/
+					else if ($(htmlLines[i])[0].tagName=="UL")// && $(htmlLines[i]).children()[0].tagName=="BR")
+					{
+						var listItems = rawElements[i].replace("\n", "\n\n").split("\n");
+						for (itemIndex = 0; itemIndex < listItems.length ; itemIndex++)
+						{
+							//if ($(li[i]).children()[0] && $(li[i]).children()[0].tagName=="BR")
+							if(listItems[itemIndex].indexOf('+ ') == 0)
+							{
+								listItems[itemIndex] = "<li><span class='hidden'>+ </span>"+listItems[itemIndex].slice(2)+"</li>";
+							}
+							else if (listItems[itemIndex]=="")
+							{
+								listItems.splice(itemIndex, 1);
+								itemIndex--;
+							}
+							/*else
+							{
+								listItems[itemIndex] = listItems[itemIndex]+"\n";
+							}*/
+						}
+						formattedElements[i] = "<ul>"+listItems.join("")+"\n</ul>";
+						//caretPosition.start+=1;
+						//caretPosition.end+=1;
+					}
+					/****************************************************************
+					* FIRST LIST ITEM
+					****************************************************************/
+					else if (line.indexOf('+ ') == 0) {
+						formattedElements[i] = "<ul><li><span class='hidden'>+ </span>"+line.slice(2)+"</li>\n\n</ul>";
+					}
+					/****************************************************************
+					* HEADERS
+					****************************************************************/
+					else if (line.indexOf('# ') == 0) {
+						formattedElements[i] = "<h1 "+alignmentClass()+"><span class='hidden'># </span>"+line.slice(2)+"</h1>";
+					}
+					else if (line.indexOf('## ') == 0) {
+						formattedElements[i] = "<h2 "+alignmentClass()+"><span class='hidden'>## </span>"+line.slice(3)+"</h2>";
+					}
+					else if (line.indexOf('### ') == 0) {
+						formattedElements[i] = "<h3 "+alignmentClass()+"><span class='hidden'>### </span>"+line.slice(4)+"</h3>";
+					}
+					else if (line.indexOf('#### ') == 0) {
+						formattedElements[i] = "<h4 "+alignmentClass()+"><span class='hidden'>#### </span>"+line.slice(5)+"</h4>";
+					}
+					else if (line.indexOf('##### ') == 0) {
+						formattedElements[i] = "<h5 "+alignmentClass()+"><span class='hidden'>##### </span>"+line.slice(6)+"</h5>";
+					}
+					else if (line.indexOf('###### ') == 0) {
+						formattedElements[i] = "<h6 "+alignmentClass()+"><span class='hidden'>###### </span>"+line.slice(7)+"</h6>";
+					}
+					/****************************************************************
+					* TEXT ALIGNMENT
+					****************************************************************/
+					else if (line.indexOf('|--') == 0) {
+						formattedElements[i] = "<p><span class='hidden'>|--</span></p>";
+						currentTextAlignment = textAlignment.LEFT;
+					}
+					else if (line.indexOf('--|') == 0) {
+						formattedElements[i] = "<p><span class='hidden'>--|</span></p>";
+						currentTextAlignment = textAlignment.RIGHT;
+					}
+					else if (line.indexOf('---') == 0) {
+						formattedElements[i] = "<p><span class='hidden'>---</span></p>";
+						currentTextAlignment = textAlignment.CENTER;
+					}
+					else if (line.indexOf('|-|') == 0) {
+						formattedElements[i] = "<p><span class='hidden'>|-|</span></p>";
+						currentTextAlignment = textAlignment.JUSTIFY;
+					}
+					/****************************************************************
+					* HORIZONTAL LINES
+					****************************************************************/
+					else if (match = (/^\*\*+\*$/g.exec(line)) != null) {
+						formattedElements[i] = "<p class='align-center'><span class='hidden'>"+line+"</span>\n</p><hr>";
+					}
+					/****************************************************************
+					* NO MARKERS AT ALL
+					****************************************************************/
+					else
+					{
+						formattedElements[i] = "<p "+alignmentClass()+">"+line+"\n</p>";
+					}
+				}
+
+				editor.innerHTML = formattedElements.join("");
+
+				editor.focus();
+				restoreSelection(editor, caretPosition);
+
+			}, false)
+		};
+
+	</script>
+</head>
+<body>
+
+	<nav>
+		<!--button id="fullscreenButton"><img src="images/JustType-assets/fullscreen.png" /></button-->
+		<!--button id="settingsButton" title="settings"><img src="images/JustType-assets/settings.png" /></button>
+		<label class="filebutton">
+			<img src="images/JustType-assets/upload.png" title="import"/>
+		<span><input type="file" id="file" name="myfile" onchange="startRead(this)"></span>
+		</label>
+		<button id="uploadButton" title="export"><img src="images/JustType-assets/download.png" /></button-->
+	</nav>
+
+	<div id="header">
+		<h1>Just Type</h1>
+		<h4>~ no frills ~</h4>
+		<div class="info"></div>
+		<nav>
+			<!--button id="fullscreenButton"><img src="images/JustType-assets/fullscreen.png" /></button-->
+			<!--button id="settingsButton" title="settings"><img src="images/JustType-assets/settings.png" /></button>
+			<label class="filebutton">
+				<img src="images/JustType-assets/upload.png" title="import"/>
+			<span><input type="file" id="file" name="myfile" onchange="startRead(this)"></span>
+			</label>
+			<button id="uploadButton" title="export"><img src="images/JustType-assets/download.png" /></button-->
+		</nav>
+	</div>
+
+	<div id="content">
+
+		<div id="caretPos"></div>
+		<div id="paper">
+			<pre id="editor" contenteditable>
+
+			</pre>
+		</div>
+	</div>
+
+	<div id="settingsMenu">
+
+		<label>Show Paper</label><tab><input id="showPaperCheckbox" type="checkbox" checked><br>
+		<label>Serif Font</label><tab><input id="serifFontCheckbox" type="checkbox">
+	</div>
+</body>
+</html>
